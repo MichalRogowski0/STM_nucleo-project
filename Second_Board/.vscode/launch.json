@@ -1,0 +1,22 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug Odbiornik",
+            "cwd": "${workspaceFolder}",
+            "executable": "./build/Debug/Second_Board.elf",
+            "request": "launch",
+            "type": "cortex-debug",
+            "runToEntryPoint": "main",
+            "servertype": "openocd",
+            "device": "STM32F446RE",
+            "configFiles": [
+                "interface/stlink.cfg",
+                "target/stm32f4x.cfg"
+            ],
+            "openOCDPreConfigLaunchCommands": [
+                "adapter serial 066AFF515086874967255728"
+            ]
+        }
+    ]
+}

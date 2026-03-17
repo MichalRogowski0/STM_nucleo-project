@@ -1,0 +1,22 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug Nadajnik",
+            "cwd": "${workspaceFolder}",
+            "executable": "./build/Debug/First_Board.elf",
+            "request": "launch",
+            "type": "cortex-debug",
+            "runToEntryPoint": "main",
+            "servertype": "openocd",
+            "device": "STM32F446RE",
+            "configFiles": [
+                "interface/stlink.cfg",
+                "target/stm32f4x.cfg"
+            ],
+            "openOCDLaunchArgs": [
+                "-c", "adapter serial 066AFF515086874967255728"
+            ]
+        }
+    ]
+}
