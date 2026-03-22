@@ -67,12 +67,14 @@ uint32_t TxMailbox;
 uint8_t TxData[8];
 uint8_t RxData[8];
 
-int datacheck = 0;
+volatile int datacheck = 0;
+
+volatile uint32_t error_count = 0;
 
 void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef *hcan)
 {
   HAL_CAN_GetRxMessage(&hcan2, CAN_RX_FIFO1, &RxHeader, RxData);
-  if(RxHeader.DLC == 2){
+  if(RxHeader.DLC == 1){
     datacheck = 1;
   }
 }
@@ -120,13 +122,10 @@ int main(void)
   }
   HAL_CAN_ActivateNotification(&hcan2, CAN_IT_RX_FIFO1_MSG_PENDING);
  
-  TxHeader.DLC = 2;
+  TxHeader.DLC = 1;
   TxHeader.IDE = CAN_ID_STD;
   TxHeader.RTR = CAN_RTR_DATA;
   TxHeader.StdId = 0x103;
-  
-  TxData[0] = 50;
-  TxData[1] = 20;
 
   /* USER CODE END 2 */
 
@@ -134,23 +133,25 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    if(datacheck){
-      uint8_t repeat = RxData[1];
-      uint8_t delay = RxData[0];
-      for(int i = 0 ; i < repeat; i++){
-        HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-        HAL_Delay(delay);
-      }
-      datacheck = 0;
-
-      HAL_CAN_AddTxMessage(&hcan2, &TxHeader, TxData, &TxMailbox);
+    if(HAL_CAN_AddTxMessage(&hcan2, &TxHeader, TxData, &TxMailbox) != HAL_OK){
+      error_count++;
     }
+
+    uint8_t brightness = RxData[0];
+    if (brightness < 100) {
+      HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
+    }
+    else {
+      HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
+    }
+
+    HAL_Delay(100);
+  }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
-}
 
 /**
   * @brief System Clock Configuration
@@ -310,7 +311,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, LD2_Pin|LED_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
@@ -318,12 +319,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : LD2_Pin */
-  GPIO_InitStruct.Pin = LD2_Pin;
+  /*Configure GPIO pins : LD2_Pin LED_Pin */
+  GPIO_InitStruct.Pin = LD2_Pin|LED_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
