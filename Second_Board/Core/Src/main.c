@@ -22,6 +22,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "can_protocol.h"
+#include "logger.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -71,11 +72,17 @@ volatile int datacheck = 0;
 
 volatile uint32_t error_count = 0;
 
+volatile uint32_t last_rx_tick = 0;
+
+log_type log_level = LOG_TYPE_INFO;
+uint8_t timeout_active = 0;
+
 void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef *hcan)
 {
   HAL_CAN_GetRxMessage(&hcan2, CAN_RX_FIFO1, &RxHeader, RxData);
-  if(RxHeader.DLC == 1){
+  if(RxHeader.DLC == CAN_DLC_CONTROL){
     datacheck = 1;
+    last_rx_tick = HAL_GetTick();
   }
 }
 /* USER CODE END 0 */
@@ -112,7 +119,10 @@ int main(void)
   MX_USART2_UART_Init();
   MX_CAN2_Init();
   /* USER CODE BEGIN 2 */
+  logger_init(&huart2);
   HAL_GPIO_WritePin(LD2_GPIO_Port,LD2_Pin,GPIO_PIN_RESET);
+  last_rx_tick = HAL_GetTick();
+
 
   HAL_CAN_Stop(&hcan2);
   HAL_CAN_ResetError(&hcan2);
@@ -133,17 +143,36 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    if (HAL_GetTick() - last_rx_tick > CAN_TIMEOUT_MS){
+      log_level = LOG_TYPE_WARN;
+      TxData[CAN_IDX_TIMEOUT_FLAG] = 1;
+      HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
+    } else {
+      log_level = LOG_TYPE_INFO;
+      TxData[CAN_IDX_TIMEOUT_FLAG] = 0;
+    }
+
     if(HAL_CAN_AddTxMessage(&hcan2, &TxHeader, TxData, &TxMailbox) != HAL_OK){
       error_count++;
     }
 
     uint8_t brightness = RxData[CAN_IDX_LIGHT_LEVEL];
-    if (brightness < 100) {
+    if (brightness < 50) {
       HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
     }
     else {
       HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
     }
+    
+    if ((HAL_GetTick() - last_rx_tick > CAN_TIMEOUT_MS) && (timeout_active == 0)) {
+      logger_log(LOG_TYPE_WARN, "CAN timeout\r\n");
+      timeout_active = 1;
+    } else if ((HAL_GetTick() - last_rx_tick <= CAN_TIMEOUT_MS) && (timeout_active == 1)) {
+      logger_log(LOG_TYPE_INFO, "CAN recovered\r\n");
+      timeout_active = 0;
+    }
+
+    logger_log(log_level, "LIGHT = %u\r\n", (unsigned int)RxData[CAN_IDX_LIGHT_LEVEL]);
 
     HAL_Delay(100);
   }
