@@ -77,11 +77,12 @@ volatile int datacheck = 0;
 
 uint32_t adc_value = 0;
 volatile uint32_t error_count = 0;
+log_type log_level = LOG_TYPE_INFO;
 
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 {
   HAL_CAN_GetRxMessage(&hcan1, CAN_RX_FIFO0, &RxHeader, RxData);
-  if(RxHeader.DLC == 1){
+  if(RxHeader.DLC == CAN_DLC_CONTROL){
     datacheck = 1;
   }
 }
@@ -154,11 +155,20 @@ int main(void)
     if(HAL_CAN_AddTxMessage(&hcan1, &TxHeader, TxData, &TxMailbox) != HAL_OK){
       error_count++;
     }
-
-    logger_log(LOG_TYPE_INFO, "ADC = %lu LIGHT = %u\r\n",
+    if (datacheck) {
+      if (RxData[CAN_IDX_TIMEOUT_FLAG] == 1){
+        log_level = LOG_TYPE_WARN;
+      } else if (RxData[CAN_IDX_TIMEOUT_FLAG] == 0){
+        log_level = LOG_TYPE_INFO;
+      } else {
+        log_level = LOG_TYPE_ERROR;
+      }
+      datacheck = 0;
+    }
+    
+    logger_log(log_level, "ADC = %lu LIGHT = %u\r\n",
                  (unsigned long)adc_value,
                  (unsigned int)TxData[CAN_IDX_LIGHT_LEVEL]);
-
 
     HAL_Delay(50);
     /* USER CODE END WHILE */
